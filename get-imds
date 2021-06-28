@@ -1,14 +1,14 @@
 #!/bin/bash
 # Licensed under Apache License v2.0. Copyright 2021 Daniel Bowers.
 
-baseurl_aws="http://169.254.169.254/latest"
-baseurl_azure="http://169.254.169.254/metadata/instance"
+baseurl_aws="http://169.254.169.254/latest/meta-data"
+baseurl_azure="http://169.254.169.254/metadata"
 baseurl_google="http://metadata.google.internal/computeMetadata/v1"
 baseurl_oracle="http://169.254.169.254/opc/v1"
 
 if [ $# -eq 0 ]; then
     echo "No arguments provided.  Usage: get-imds [parameter]"
-    echo "Valid parameters: cloud, region, instance_type, image_name, vm_id, private_ip, public_ip"
+    echo "Valid parameters: cloud, region, instance_type, image_name, vm_id, hostname, mac, private_ip, public_ip"
     exit 1
 fi
 
@@ -29,12 +29,12 @@ if [ $? -ne 0 ]; then
 fi
 
 # Determine cloud. Test in order: AWS, Azure, Oracle, Google.
-test_value=`wget -t 1 -T 1 -q -O - "$baseurl_aws/meta-data/instance-id"`
+test_value=`wget -t 1 -T 1 -q -O - "$baseurl_aws/instance-id"`
 if [ -n "$test_value" ]; then
       cloud="aws"
    else
 
-      test_value=`wget -t 1 -T 1 -q -O - --header="Metadata:true" "$baseurl_azure/compute/azEnvironment?api-version=2019-03-11&format=text"`
+      test_value=`wget -t 1 -T 1 -q -O - --header="Metadata:true" "$baseurl_azure/instance/compute/azEnvironment?api-version=2019-03-11&format=text"`
       if [ -n "$test_value" ]; then
          cloud="azure"
       else
@@ -64,22 +64,30 @@ if [ "$cloud" = "aws" ]; then
            exit 0
            ;;
         "region")
-           param_name="/meta-data/placement/availability-zone"
+           param_name="placement/region"
            ;;
         "instance_type")
-           param_name="/meta-data/instance_type"
+           param_name="instance-type"
            ;;
         "image_name")
-           param_name="/meta-data/ami-id"
+           param_name="ami-id"
            ;;
         "vm_id")
-           param_name="/meta-data/instance-id"
+           param_name="instance-id"
+           ;;
+        "hostname")
+           param_name="hostname"
+           ;;
+        "mac")
+           param_name="mac"
            ;;
         "private_ip")
-           param_name="/meta-data/local-ipv4"
+           param_name="local-ipv4"
            ;;
         "public_ip")
-           param_name="/meta-data/public-ipv4"
+           # For AWS, need to use instance mac address in path of public ip
+           temp_param_value=`wget -t 1 -T 1 -q -O - "$baseurl_aws/mac"`
+           param_name="network/interfaces/macs/$temp_param_value/public-ipv4s"
            ;;
         *)
            echo "Error: Unknown parameter."
@@ -93,22 +101,28 @@ if [ "$cloud" = "aws" ]; then
            exit 0
            ;;
         "region")
-           param_name="compute/location"
+           param_name="instance/compute/location"
            ;;
         "instance_type")
-           param_name="compute/vmSize"
+           param_name="instance/compute/vmSize"
            ;;
         "image_name")
-           param_name="compute/offer"
+           param_name="instance/compute/offer"
            ;;
         "vm_id")
-           param_name="compute/vmId"
+           param_name="instance/compute/vmId"
+           ;;
+        "hostname")
+           param_name="instance/compute/name"
+           ;;
+        "mac")
+           param_name="instance/network/interface/0/macAddress"
            ;;
         "private_ip")
-           param_name="network/interface/0/ipv4/ipAddress/0/privateIpAddress"
+           param_name="instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress"
            ;;
         "public_ip")
-           param_name="network/interface/0/ipv4/ipAddress/0/publicIpAddress"
+           param_name="instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress"
            ;;
         *)
            echo "Error: Unknown parameter."
@@ -132,6 +146,12 @@ if [ "$cloud" = "aws" ]; then
            ;;
         "vm_id")
            param_name="instance/id"
+           ;;
+        "hostname")
+           param_name="instance/hostname"
+           ;;
+        "mac")
+           param_name="vnics/0/macAddr"
            ;;
         "private_ip")
            param_name="vnics/0/privateIp"
@@ -161,6 +181,12 @@ if [ "$cloud" = "aws" ]; then
            ;;
         "vm_id")
            param_name="instance/id"
+           ;;
+        "hostname")
+           param_name="instance/hostname"
+           ;;
+        "mac")
+           param_name="instance/network-interfaces/0/mac"
            ;;
         "private_ip")
            param_name="instance/network-interfaces/0/ip"
