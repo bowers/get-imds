@@ -1,0 +1,210 @@
+#!/bin/bash
+# Licensed under Apache License v2.0. Copyright 2021 Daniel Bowers.
+
+baseurl_aws="http://169.254.169.254/latest"
+baseurl_azure="http://169.254.169.254/metadata/instance"
+baseurl_google="http://metadata.google.internal/computeMetadata/v1"
+baseurl_oracle="http://169.254.169.254/opc/v1"
+
+if [ $# -eq 0 ]; then
+    echo "No arguments provided.  Usage: get-imds [parameter]"
+    echo "Valid parameters: cloud, region, instance_type, image_name, vm_id, private_ip, public_ip"
+    exit 1
+fi
+
+param=$1
+
+# If wget not installed, install it.
+WGET=wget
+which $WGET > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    if [[ ! -z "$( which apt-get )" ]]; then
+        sudo apt-get install -qq -y wget > /dev/null
+    elif [[ ! -z "$( which yum )" ]]; then
+        sudo yum -q -y install wget  > /dev/null
+    else
+        echo "Error: Cannot find or install wget."
+        exit 1
+    fi
+fi
+
+# Determine cloud. Test in order: AWS, Azure, Oracle, Google.
+test_value=`wget -t 1 -T 1 -q -O - "$baseurl_aws/meta-data/instance-id"`
+if [ -n "$test_value" ]; then
+      cloud="aws"
+   else
+
+      test_value=`wget -t 1 -T 1 -q -O - --header="Metadata:true" "$baseurl_azure/compute/azEnvironment?api-version=2019-03-11&format=text"`
+      if [ -n "$test_value" ]; then
+         cloud="azure"
+      else
+
+         test_value=`wget -t 1 -T 1 -q -O - "$baseurl_oracle/instance/ociAdName"`
+         if [ -n "$test_value" ]; then
+               cloud="oracle"
+         else
+
+            test_value=`wget -t 1 -T 1 -q -O - --header="Metadata-Flavor:Google" "$baseurl_google/instance/zone"`
+            if [ -n "$test_value" ]; then
+                  cloud="google"
+            else
+
+               echo "Error: Unknown cloud."
+               exit 1
+            fi
+         fi
+      fi
+fi
+
+# Translate parameter name to cloud-specific term
+if [ "$cloud" = "aws" ]; then
+     case "$param" in
+        "cloud")
+           echo "aws"
+           exit 0
+           ;;
+        "region")
+           param_name="/meta-data/placement/availability-zone"
+           ;;
+        "instance_type")
+           param_name="/meta-data/instance_type"
+           ;;
+        "image_name")
+           param_name="/meta-data/ami-id"
+           ;;
+        "vm_id")
+           param_name="/meta-data/instance-id"
+           ;;
+        "private_ip")
+           param_name="/meta-data/local-ipv4"
+           ;;
+        "public_ip")
+           param_name="/meta-data/public-ipv4"
+           ;;
+        *)
+           echo "Error: Unknown parameter."
+           exit 1
+           ;;
+     esac
+   elif [ "$cloud" = "azure" ]; then
+     case "$param" in
+        "cloud")
+           echo "azure"
+           exit 0
+           ;;
+        "region")
+           param_name="compute/location"
+           ;;
+        "instance_type")
+           param_name="compute/vmSize"
+           ;;
+        "image_name")
+           param_name="compute/offer"
+           ;;
+        "vm_id")
+           param_name="compute/vmId"
+           ;;
+        "private_ip")
+           param_name="network/interface/0/ipv4/ipAddress/0/privateIpAddress"
+           ;;
+        "public_ip")
+           param_name="network/interface/0/ipv4/ipAddress/0/publicIpAddress"
+           ;;
+        *)
+           echo "Error: Unknown parameter."
+           exit 1
+           ;;
+     esac
+   elif [ "$cloud" = "oracle" ]; then
+     case "$param" in
+        "cloud")
+           echo "oracle"
+           exit 0
+           ;;
+        "region")
+           param_name="instance/region"
+           ;;
+        "instance_type")
+           param_name="instance/shape"
+           ;;
+        "image_name")
+           param_name="instance/image"
+           ;;
+        "vm_id")
+           param_name="instance/id"
+           ;;
+        "private_ip")
+           param_name="vnics/0/privateIp"
+           ;;
+        "public_ip")
+           param_name="vnics/0/publicIp"
+           ;;
+        *)
+           echo "Error: Unknown parameter."
+           exit 1
+           ;;
+     esac
+   elif [ "$cloud" = "google" ]; then
+     case "$param" in
+        "cloud")
+           echo "google"
+           exit 0
+           ;;
+        "region")
+           param_name="instance/zone"
+           ;;
+        "instance_type")
+           param_name="instance/machine-type"
+           ;;
+        "image_name")
+           param_name="instance/image"
+           ;;
+        "vm_id")
+           param_name="instance/id"
+           ;;
+        "private_ip")
+           param_name="instance/network-interfaces/0/ip"
+           ;;
+        "public_ip")
+           param_name="instance/network-interfaces/0/access-configs/0/external-ip"
+           ;;
+        *)
+           echo "Error: Unknown parameter."
+           exit 1
+           ;;
+     esac
+   else
+      echo "Can't determine cloud."
+      exit 1
+fi
+
+# Fetch parameter
+case "$cloud" in
+   "aws")
+      param_value=`wget -t 1 -T 1 -q -O - "$baseurl_aws/$param_name"`
+      ;;
+   "azure")
+      param_value=`wget -t 1 -T 1 -q -O - --header="Metadata:true" "$baseurl_azure/$param_name?api-version=2021-02-01&format=text"`
+      ;;
+   "google")
+      param_temp=`wget -t 1 -T 1 -q -O - --header="Metadata-Flavor:Google" "$baseurl_google/$param_name"`
+      param_value="${param_temp##*/}"
+      ;;
+   "oracle")
+      param_value=`wget -t 1 -T 1 -q -O - "$baseurl_oracle/$param_name"`
+      ;;
+   *)
+      echo "Error: Unknown cloud."
+      exit 1
+      ;;
+esac
+
+
+# Return parameter value if it was found
+if [ -n "$param_value" ]; then
+      echo $param_value
+   else
+      exit 1
+fi
+
+exit 0
