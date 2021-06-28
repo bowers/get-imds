@@ -15,7 +15,9 @@ region        | Region or zone the instances is running on
 instance_type | Instance machine type / shape
 image_name    | Name of the image (e.g. AMI)
 vm_id         | Identifier assigned by the cloud
-private_ip    | Private IP address for the first network interface (X.X.X.X) 
+hostname      | Instance hostname
+mac           | MAC address (for NIC 0, if more than 1 NIC)
+private_ip    | Private IP address for the first network interface 
 public_ip     | Not available from all clouds
 
 ### How to Use ###
