@@ -3,7 +3,7 @@ Bash script to read common Instance MetaData Service (IMDS) values from multiple
 
 Returns just the text string of the value. Auto-detects which cloud an instance is running on (AWS, Microsoft Azure, Google Cloud, or Oracle Cloud). For AWS and Oracle Cloud, get-imds uses IMDSv1.
 
-Markup :  #### Syntax ####
+#### Syntax ####
 ```
 get-imds [key]
 ```
@@ -18,7 +18,7 @@ vm_id         | Identifier assigned by the cloud
 private_ip    | Private IP address for the first network interface (X.X.X.X) 
 public_ip     | Not available from all clouds
 
-Markup :  #### How to Use ####
+#### How to Use ####
 Getting Started
 ```
 curl https://raw.githubusercontent.com/bowers/get-imds/main/get-imds > get-imds && chmod +x ./get-imds
