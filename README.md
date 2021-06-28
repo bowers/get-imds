@@ -1,5 +1,5 @@
 # get-imds
-Script to read common Instance MetaData Service (IMDS) values from multiple public clouds
+Bash script to read common Instance MetaData Service (IMDS) values from multiple public clouds.
 
 Returns just the text string of the value. Auto-detects which cloud an instance is running on (AWS, Microsoft Azure, Google Cloud, or Oracle Cloud). 
 
